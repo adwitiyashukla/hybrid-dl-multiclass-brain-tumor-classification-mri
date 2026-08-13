@@ -22,18 +22,27 @@ def make_scaler(device, enabled):
         return torch.cuda.amp.GradScaler(enabled=enabled)
 
 class ModelEma:
-    def __init__(self, model, decay=0.999):
+    def __init__(self, model, decay=0.999, warmup=True):
         self.decay = decay
+        self.warmup = warmup
+        self.updates = 0
         self.module = copy.deepcopy(model).eval()
         for param in self.module.parameters():
             param.requires_grad_(False)
 
+    def current_decay(self):
+        if not self.warmup:
+            return self.decay
+        return min(self.decay, (1.0 + self.updates) / (10.0 + self.updates))
+
     @torch.no_grad()
     def update(self, model):
+        self.updates += 1
+        decay = self.current_decay()
         for ema_param, param in zip(self.module.state_dict().values(),
                                     model.state_dict().values()):
             if ema_param.dtype.is_floating_point:
-                ema_param.mul_(self.decay).add_(param.detach(), alpha=1.0 - self.decay)
+                ema_param.mul_(decay).add_(param.detach(), alpha=1.0 - decay)
             else:
                 ema_param.copy_(param)
 
@@ -148,6 +157,7 @@ def save_checkpoint(path, model, optimizer, scheduler, scaler, ema, epoch,
         "scheduler": scheduler.state_dict() if scheduler is not None else None,
         "scaler": scaler.state_dict() if scaler is not None else None,
         "ema": ema.state_dict() if ema is not None else None,
+        "ema_updates": ema.updates if ema is not None else 0,
         "epoch": epoch,
         "best_metric": best_metric,
         "config": config,
@@ -169,6 +179,7 @@ def load_checkpoint(path, model, optimizer=None, scheduler=None, scaler=None,
         scaler.load_state_dict(payload["scaler"])
     if ema is not None and payload.get("ema"):
         ema.load_state_dict(payload["ema"])
+        ema.updates = payload.get("ema_updates", 0)
     return payload
 
 def write_history(path, history):

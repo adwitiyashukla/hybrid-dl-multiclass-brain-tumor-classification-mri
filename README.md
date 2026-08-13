@@ -72,8 +72,9 @@ averaged over four angles.
 
 ## Dataset
 
-Brain Tumor MRI Dataset, 7023 T1 weighted contrast enhanced slices across four
-classes, assembled from the figshare, SARTAJ and Br35H collections.
+Brain Tumor MRI Dataset, 7200 T1 weighted contrast enhanced slices across four
+classes, assembled from the figshare, SARTAJ and Br35H collections. The release used
+here is class balanced: 1400 training and 400 test images per class.
 
 https://www.kaggle.com/datasets/masoudnickparvar/brain-tumor-mri-dataset
 
@@ -92,6 +93,26 @@ rather than reshuffled, because the source collections contain multiple adjacent
 slices from the same patient without patient identifiers. Re-splitting at the image
 level would place near duplicate slices of one patient in both train and test and
 inflate the reported scores.
+
+## Preprocessing quality
+
+Measured over all 7200 images by `scripts/precompute_dip.py`, which writes a per image
+quality report to `data/cache/quality_<split>.csv`.
+
+| Metric | Training (5600) | Testing (1600) |
+|---|---|---|
+| Brain extraction fallback | 77 images, 1.38 percent | 22 images, 1.38 percent |
+| Low contrast flagged | 0, 0.00 percent | 0, 0.00 percent |
+| Mean brain fraction | 0.299 | 0.304 |
+| Mean symmetry score | 21.37 | 22.00 |
+
+Otsu based skull stripping is not perfect. When the resulting mask covers an
+implausible fraction of the frame the pipeline falls back to a centred ellipse and
+records a flag, rather than passing a bad mask silently downstream. The fallback rate
+is reported here because a pipeline that fails on some fraction of its inputs without
+measuring it is worse than one that measures and states the number. The two splits
+producing the same rate independently indicates the behaviour is stable rather than
+tuned to one subset.
 
 ## Setup
 
@@ -129,6 +150,15 @@ Evaluation reports macro F1, balanced accuracy, per class precision and recall,
 macro AUC, Cohen kappa, expected calibration error, tumor sensitivity and
 specificity, and bootstrap confidence intervals over 2000 resamples.
 
+## A note on the loss
+
+The training objective is class balanced focal loss. On this balanced release the
+class balanced weights reduce to uniform and the weighted sampler becomes a no op, so
+the objective is effectively plain focal loss with label smoothing. Both mechanisms
+are retained because the original unbalanced release of this dataset and the BraTS
+volumes targeted as a follow up are not balanced, and because the ablation rows change
+the training subset composition.
+
 ## Ablations
 
 Each row is reproduced by editing `configs/base.yaml`. Run three seeds per row and
@@ -148,9 +178,13 @@ report mean and standard deviation.
 ## Results
 
 Populated from `runs/<experiment>/test_results.json` after running
-`scripts/evaluate.py`. Report macro F1 and balanced accuracy with bootstrap
-confidence intervals rather than accuracy alone, since accuracy on this dataset is
-dominated by the majority classes.
+`scripts/evaluate.py`.
+
+Because this release is class balanced, accuracy and balanced accuracy converge and
+neither exposes uneven per class behaviour on its own. Macro F1 is reported alongside
+them because it reflects the precision and recall trade off within each class, and
+bootstrap confidence intervals are reported because a single point estimate on a 1600
+image test set cannot separate a real improvement from run to run noise.
 
 ## Tests
 

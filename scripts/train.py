@@ -137,15 +137,30 @@ def main():
             train_cfg["max_grad_norm"],
         )
 
-        eval_model = ema.module if ema is not None else model
-        val_stats = evaluate(eval_model, val_loader, criterion, device, use_handcrafted)
-        val_metrics = compute_metrics(val_stats["labels"], val_stats["probs"])
+        raw_stats = evaluate(model, val_loader, criterion, device, use_handcrafted)
+        raw_metrics = compute_metrics(raw_stats["labels"], raw_stats["probs"])
+
+        if ema is not None:
+            val_stats = evaluate(ema.module, val_loader, criterion, device,
+                                 use_handcrafted)
+            val_metrics = compute_metrics(val_stats["labels"], val_stats["probs"])
+        else:
+            val_stats, val_metrics = raw_stats, raw_metrics
 
         print(f"  train loss {train_stats['loss']:.4f} acc {train_stats['accuracy']:.4f} "
               f"({train_stats['seconds']:.0f}s)")
-        print(f"  val   loss {val_stats['loss']:.4f} "
-              f"macro_f1 {val_metrics['macro_f1']:.4f} "
-              f"bal_acc {val_metrics['balanced_accuracy']:.4f}")
+        print(f"  val raw  loss {raw_stats['loss']:.4f} "
+              f"macro_f1 {raw_metrics['macro_f1']:.4f} "
+              f"bal_acc {raw_metrics['balanced_accuracy']:.4f}")
+        if ema is not None:
+            print(f"  val ema  loss {val_stats['loss']:.4f} "
+                  f"macro_f1 {val_metrics['macro_f1']:.4f} "
+                  f"bal_acc {val_metrics['balanced_accuracy']:.4f} "
+                  f"(decay {ema.current_decay():.4f})")
+            gap = raw_metrics["macro_f1"] - val_metrics["macro_f1"]
+            if gap > 0.15:
+                print(f"  WARNING ema trails raw model by {gap:.3f} macro_f1, "
+                      f"ema may be under converged")
         if val_stats["gates"] is not None:
             print(f"  mean fusion gate {val_stats['gates'].mean():.4f}")
 
@@ -156,6 +171,7 @@ def main():
             "val_loss": val_stats["loss"],
             "val_macro_f1": val_metrics["macro_f1"],
             "val_balanced_accuracy": val_metrics["balanced_accuracy"],
+            "val_raw_macro_f1": raw_metrics["macro_f1"],
         })
 
         save_checkpoint(last_path, model, optimizer, scheduler, scaler, ema,
