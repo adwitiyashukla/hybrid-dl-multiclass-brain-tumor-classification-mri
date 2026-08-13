@@ -1,0 +1,47 @@
+experiment:
+  name: e6_full
+  seed: 42
+  output_dir: runs/e6_full
+
+data:
+  train_dir: data/Training
+  test_dir: data/Testing
+  cache_dir: data/cache
+  val_fraction: 0.15
+  image_size: 256
+  num_workers: 2
+
+dip:
+  do_skull_strip: true
+  do_bias_correction: true
+  do_denoise: true
+  do_normalise: true
+  do_clahe: true
+  do_symmetry: true
+
+model:
+  backbone: efficientnet_b0
+  n_classes: 4
+  in_chans: 3
+  n_handcrafted: 43
+  use_handcrafted: true
+  use_cbam: true
+  pretrained: true
+  dropout: 0.3
+  fusion_dim: 256
+
+train:
+  epochs: 30
+  batch_size: 32
+  grad_accum_steps: 1
+  learning_rate: 0.0003
+  weight_decay: 0.0001
+  warmup_epochs: 2
+  amp: true
+  ema_decay: 0.999
+  max_grad_norm: 1.0
+  label_smoothing: 0.05
+
+loss:
+  gamma: 2.0
+  beta: 0.9999
