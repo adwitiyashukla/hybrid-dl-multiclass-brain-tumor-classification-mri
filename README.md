@@ -179,72 +179,99 @@ report mean and standard deviation.
 
 Measured on the 1600 image held out test split, using the checkpoint selected by
 validation macro F1. Confidence intervals are bootstrap percentile intervals over 2000
-resamples of the test set.
+resamples of the test set. This is the configuration deployed in the live demo.
 
 | Metric | Value |
 |---|---|
-| Macro F1 | 0.9435, 95 percent CI [0.9324, 0.9545] |
-| Balanced accuracy | 0.9444, 95 percent CI [0.9339, 0.9548] |
-| Macro AUC | 0.9905 |
-| Cohen kappa | 0.9258 |
-| Expected calibration error | 0.0135 |
-| Tumor sensitivity | 0.9833 |
+| Macro F1 | 0.9407, 95 percent CI [0.9286, 0.9515] |
+| Balanced accuracy | 0.9419, 95 percent CI [0.9309, 0.9519] |
+| Macro AUC | 0.9878 |
+| Cohen kappa | 0.9225 |
+| Expected calibration error | 0.0098 |
+| Tumor sensitivity | 0.9750 |
 | Tumor specificity | 0.9950 |
-| Mean fusion gate | 0.473 |
+| Mean fusion gate | 0.476 |
 
 Per class:
 
 | Class | Precision | Recall | F1 | n |
 |---|---|---|---|---|
-| glioma | 0.980 | 0.840 | 0.904 | 400 |
-| meningioma | 0.894 | 0.950 | 0.921 | 400 |
-| notumor | 0.952 | 0.995 | 0.973 | 400 |
-| pituitary | 0.959 | 0.993 | 0.975 | 400 |
+| glioma | 0.991 | 0.820 | 0.897 | 400 |
+| meningioma | 0.899 | 0.958 | 0.927 | 400 |
+| notumor | 0.930 | 0.995 | 0.961 | 400 |
+| pituitary | 0.959 | 0.995 | 0.977 | 400 |
 
 Confusion matrix, rows are true class, columns are predicted:
 
 ```
               glioma  mening  notumor  pituit
-glioma           336      42       18       4
-meningioma         6     380        2      12
-notumor            0       1      398       1
-pituitary          1       2        0     397
+glioma           328      40       25       7
+meningioma         2     383        5      10
+notumor            0       2      398       0
+pituitary          1       1        0     398
 ```
 
 ### Reading these results honestly
 
-**Validation reported 0.975 macro F1 and the test set gives 0.9435.** The gap is
-expected, since the checkpoint was chosen by validation score, but it is the reason
-the test number is the one quoted here and the validation number is not.
+**Validation reported 0.9798 balanced accuracy and the test set gives 0.9419.** The gap
+is expected, since the checkpoint was chosen by validation score. The test number is
+the one quoted here and the validation number is not.
 
-**Glioma is the weakest class at 0.840 recall.** 64 of 400 gliomas were misclassified,
-42 of them as meningioma. Gliomas are infiltrative and heterogeneous in appearance,
-so this is the expected direction of failure, but the magnitude matters.
+**Glioma is the weakest class at 0.820 recall.** 72 of 400 gliomas were misclassified,
+40 of them as meningioma. Gliomas are infiltrative and heterogeneous in appearance, so
+this is the expected direction of failure.
 
-**18 gliomas were classified as no tumor.** These are the clinically consequential
+**25 gliomas were classified as no tumor.** These are the clinically consequential
 errors, since a missed tumor carries far more cost than a confusion between two tumor
-types. Overall tumor sensitivity is 0.9833, meaning 20 of 1200 tumor cases were called
-healthy, and 18 of those 20 were gliomas. Any future work on this system should target
-glioma recall specifically rather than overall accuracy.
+types. Overall tumor sensitivity is 0.9750, meaning 30 of 1200 tumor cases were called
+healthy, and 25 of those 30 were gliomas. Any future work should target glioma recall
+specifically rather than overall accuracy.
 
-**Calibration is good.** An expected calibration error of 0.0135 means predicted
+**Calibration is good.** An expected calibration error of 0.0098 means predicted
 confidence tracks observed accuracy closely, so the confidence value shown in the
 application is meaningful rather than decorative.
 
-### A hypothesis that did not hold
+### Experiment: does the asymmetry map need to preserve lesion side?
 
-Before running the experiments the prediction was that pituitary adenomas would be the
-weakest class, on the reasoning that they sit on the midline at the skull base and
-therefore produce approximately symmetric abnormality, which is exactly the case the
-bilateral symmetry prior is least able to detect.
+The bilateral asymmetry map was originally computed as `abs(I - mirror(I))`. That
+quantity is symmetric by construction, since the value at position x and at its mirror
+position are identical, so the map highlights the lesion and its mirror image equally
+and carries no information about which side the lesion is actually on.
 
-That prediction was wrong. Pituitary was the strongest class at 0.975 F1, and glioma
-was the weakest at 0.904. The likely explanation is that pituitary adenomas occur at a
-characteristic anatomical location and on a narrow range of slice levels, so the
-convolutional stream can identify them from spatial context without needing the
-asymmetry cue at all. It is recorded here rather than removed because a stated
-prediction that fails is a result, and the ablation rows in the table above are the
-means of testing that explanation directly.
+Measured on a synthetic phantom with a tumor at a known position, moving the tumor 76
+pixels across the midline moved the peak of the `abs` map by 0.0 pixels, under bias
+field swings from 0 to 60 percent. Replacing it with `relu(I - mirror(I))`, which keeps
+only the hyperintense side, moved the peak by 35 to 44 pixels, recovering roughly half
+the true displacement and remaining stable across the same bias range.
+
+Both formulations were then trained end to end under identical conditions. The
+preprocessing quality metrics were byte identical between the two runs, so the
+asymmetry map was the only variable.
+
+| Metric | `abs`, no laterality | `relu`, keeps laterality |
+|---|---|---|
+| Macro F1 | 0.9435 [0.9324, 0.9545] | 0.9407 [0.9286, 0.9515] |
+| Balanced accuracy | 0.9444 | 0.9419 |
+| Macro AUC | 0.9905 | 0.9878 |
+| Expected calibration error | 0.0135 | 0.0098 |
+| Tumor sensitivity | 0.9833 | 0.9750 |
+| Gliomas called no tumor | 18 | 25 |
+
+**The change did not improve accuracy.** Macro F1 moved by -0.0028 against a confidence
+interval roughly 0.022 wide, so the two configurations are not distinguishable on a
+single seed each. Calibration improved slightly and tumor sensitivity degraded slightly,
+and neither movement is resolvable at this sample size.
+
+The most likely explanation is that the laterality information was never missing from
+the model's point of view. The asymmetry map is supplied as one of three input channels
+alongside the processed slice itself, and the slice plainly shows which side the lesion
+is on, so the convolutional stream can recover laterality without help from the
+asymmetry channel.
+
+The `relu` formulation is the one deployed, on the grounds that it is the better
+motivated quantity and calibrates slightly better, not on the grounds that it is more
+accurate. Settling the question properly would require the three seeds per configuration
+prescribed in the ablation protocol below, which was not run.
 
 ## Tests
 
