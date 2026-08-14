@@ -75,6 +75,29 @@ def test_symmetry_localises_tumour(tumour_case):
     distance = np.hypot(cols.mean() - centre[0], rows.mean() - centre[1])
     assert distance < 45
 
+def peak_region_centroid(asymmetry, percentile=97):
+    positive = asymmetry[asymmetry > 0]
+    if positive.size < 10:
+        return float("nan")
+    threshold = np.percentile(positive, percentile)
+    rows, cols = np.where(asymmetry >= threshold)
+    return float(cols.mean())
+
+def test_asymmetry_map_tracks_lesion_side():
+    centroids = {}
+    positions = {}
+    for side in ("left", "right"):
+        image, centre = make_phantom(tumour=True, tumour_side=side, seed=1)
+        output = run_dip_pipeline(image, output_size=256)
+        centroids[side] = peak_region_centroid(output["asymmetry"].astype(np.float64))
+        positions[side] = centre[0]
+
+    observed = centroids["right"] - centroids["left"]
+    expected = positions["right"] - positions["left"]
+
+    assert observed > 0
+    assert observed > 0.25 * expected
+
 def test_tumour_more_asymmetric_than_healthy(tumour_case, healthy_case):
     image, _ = tumour_case
     tumour_output = run_dip_pipeline(image, output_size=256)

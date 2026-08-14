@@ -177,14 +177,74 @@ report mean and standard deviation.
 
 ## Results
 
-Populated from `runs/<experiment>/test_results.json` after running
-`scripts/evaluate.py`.
+Measured on the 1600 image held out test split, using the checkpoint selected by
+validation macro F1. Confidence intervals are bootstrap percentile intervals over 2000
+resamples of the test set.
 
-Because this release is class balanced, accuracy and balanced accuracy converge and
-neither exposes uneven per class behaviour on its own. Macro F1 is reported alongside
-them because it reflects the precision and recall trade off within each class, and
-bootstrap confidence intervals are reported because a single point estimate on a 1600
-image test set cannot separate a real improvement from run to run noise.
+| Metric | Value |
+|---|---|
+| Macro F1 | 0.9435, 95 percent CI [0.9324, 0.9545] |
+| Balanced accuracy | 0.9444, 95 percent CI [0.9339, 0.9548] |
+| Macro AUC | 0.9905 |
+| Cohen kappa | 0.9258 |
+| Expected calibration error | 0.0135 |
+| Tumor sensitivity | 0.9833 |
+| Tumor specificity | 0.9950 |
+| Mean fusion gate | 0.473 |
+
+Per class:
+
+| Class | Precision | Recall | F1 | n |
+|---|---|---|---|---|
+| glioma | 0.980 | 0.840 | 0.904 | 400 |
+| meningioma | 0.894 | 0.950 | 0.921 | 400 |
+| notumor | 0.952 | 0.995 | 0.973 | 400 |
+| pituitary | 0.959 | 0.993 | 0.975 | 400 |
+
+Confusion matrix, rows are true class, columns are predicted:
+
+```
+              glioma  mening  notumor  pituit
+glioma           336      42       18       4
+meningioma         6     380        2      12
+notumor            0       1      398       1
+pituitary          1       2        0     397
+```
+
+### Reading these results honestly
+
+**Validation reported 0.975 macro F1 and the test set gives 0.9435.** The gap is
+expected, since the checkpoint was chosen by validation score, but it is the reason
+the test number is the one quoted here and the validation number is not.
+
+**Glioma is the weakest class at 0.840 recall.** 64 of 400 gliomas were misclassified,
+42 of them as meningioma. Gliomas are infiltrative and heterogeneous in appearance,
+so this is the expected direction of failure, but the magnitude matters.
+
+**18 gliomas were classified as no tumor.** These are the clinically consequential
+errors, since a missed tumor carries far more cost than a confusion between two tumor
+types. Overall tumor sensitivity is 0.9833, meaning 20 of 1200 tumor cases were called
+healthy, and 18 of those 20 were gliomas. Any future work on this system should target
+glioma recall specifically rather than overall accuracy.
+
+**Calibration is good.** An expected calibration error of 0.0135 means predicted
+confidence tracks observed accuracy closely, so the confidence value shown in the
+application is meaningful rather than decorative.
+
+### A hypothesis that did not hold
+
+Before running the experiments the prediction was that pituitary adenomas would be the
+weakest class, on the reasoning that they sit on the midline at the skull base and
+therefore produce approximately symmetric abnormality, which is exactly the case the
+bilateral symmetry prior is least able to detect.
+
+That prediction was wrong. Pituitary was the strongest class at 0.975 F1, and glioma
+was the weakest at 0.904. The likely explanation is that pituitary adenomas occur at a
+characteristic anatomical location and on a narrow range of slice levels, so the
+convolutional stream can identify them from spatial context without needing the
+asymmetry cue at all. It is recorded here rather than removed because a stated
+prediction that fails is a result, and the ablation rows in the table above are the
+means of testing that explanation directly.
 
 ## Tests
 

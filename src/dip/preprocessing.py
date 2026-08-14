@@ -203,7 +203,7 @@ def symmetry_analysis(
     mirror_mask = full_mask[:, ::-1]
     valid = full_mask & mirror_mask
 
-    diff = np.abs(full - mirrored)
+    diff = np.maximum(full - mirrored, 0.0)
     diff = np.where(valid, diff, 0.0)
 
     diff = _warp(diff, -best_angle, -best_shift * scale * (w / search_size))
