@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data.dataset import BrainMRIDataset, scan_directory
+from decision import apply_offsets
 from engine import evaluate
 from losses import ClassBalancedFocalLoss
 from metrics import bootstrap_ci, compute_metrics, confusion, format_report
@@ -21,6 +22,7 @@ def main():
     parser.add_argument("--config", default="configs/base.yaml")
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--bootstrap", type=int, default=2000)
+    parser.add_argument("--offsets", default=None)
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
@@ -48,6 +50,12 @@ def main():
 
     criterion = ClassBalancedFocalLoss().to(device)
     stats = evaluate(model, loader, criterion, device, model_cfg["use_handcrafted"])
+
+    if args.offsets and Path(args.offsets).exists():
+        payload_offsets = json.loads(Path(args.offsets).read_text(encoding="utf-8"))
+        stats["probs"] = apply_offsets(stats["probs"], payload_offsets["offsets"])
+        print(f"applied decision offsets {payload_offsets['offsets']}")
+
     metrics = compute_metrics(stats["labels"], stats["probs"])
 
     print(format_report(metrics))

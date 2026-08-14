@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT / "src"))
 sys.path.insert(0, str(ROOT / "tests"))
 
 from dip.handcrafted import FEATURE_NAMES, N_FEATURES, extract_features
+from decision import apply_offsets, coordinate_search
 from dip.preprocessing import (correct_bias_field, extract_brain,
                                run_dip_pipeline, stack_channels,
                                symmetry_analysis)
@@ -38,6 +39,43 @@ def tumour_case():
 def healthy_case():
     image, _ = make_phantom(tumour=False, seed=2)
     return image
+
+def test_apply_offsets_returns_valid_distribution():
+    rng = np.random.default_rng(0)
+    logits = rng.normal(0, 1, (20, 4))
+    probs = np.exp(logits) / np.exp(logits).sum(1, keepdims=True)
+    adjusted = apply_offsets(probs, [0.5, -0.2, 0.0, 0.1])
+
+    assert adjusted.shape == probs.shape
+    assert np.allclose(adjusted.sum(axis=1), 1.0)
+    assert (adjusted >= 0).all()
+
+def test_zero_offsets_leave_predictions_unchanged():
+    rng = np.random.default_rng(1)
+    logits = rng.normal(0, 1, (50, 4))
+    probs = np.exp(logits) / np.exp(logits).sum(1, keepdims=True)
+    adjusted = apply_offsets(probs, [0.0, 0.0, 0.0, 0.0])
+
+    assert np.allclose(adjusted, probs, atol=1e-9)
+
+def test_offset_search_recovers_a_suppressed_class():
+    rng = np.random.default_rng(2)
+    n = 600
+    labels = rng.integers(0, 4, n)
+    logits = rng.normal(0, 1, (n, 4))
+    logits[np.arange(n), labels] += 2.0
+    logits[labels == 0, 0] -= 1.2
+    probs = np.exp(logits) / np.exp(logits).sum(1, keepdims=True)
+
+    from metrics import compute_metrics
+
+    before = compute_metrics(labels, probs)
+    offsets, _ = coordinate_search(labels, probs, "macro_f1", 2)
+    after = compute_metrics(labels, apply_offsets(probs, offsets))
+
+    assert after["macro_f1"] >= before["macro_f1"]
+    assert after["recall_glioma"] > before["recall_glioma"]
+    assert abs(float(np.mean(offsets))) < 1e-9
 
 def test_brain_extraction_plausible(tumour_case):
     image, _ = tumour_case
