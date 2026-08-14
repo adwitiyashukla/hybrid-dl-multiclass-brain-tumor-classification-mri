@@ -23,6 +23,7 @@ def main():
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--bootstrap", type=int, default=2000)
     parser.add_argument("--offsets", default=None)
+    parser.add_argument("--exclude", default=None)
     args = parser.parse_args()
 
     config = yaml.safe_load(Path(args.config).read_text(encoding="utf-8"))
@@ -38,6 +39,18 @@ def main():
     model.eval()
 
     records = scan_directory(data_cfg["test_dir"])
+
+    if args.exclude and Path(args.exclude).exists():
+        payload_excl = json.loads(Path(args.exclude).read_text(encoding="utf-8"))
+        leaked = {entry["test"] for entry in payload_excl["flagged"]}
+        before = len(records)
+        records = [
+            r for r in records
+            if f"{r['class_name']}/{Path(r['path']).name}" not in leaked
+        ]
+        print(f"excluded {before - len(records)} leaked test images, "
+              f"{len(records)} remain")
+
     dataset = BrainMRIDataset(
         records, cache_dir=Path(data_cfg["cache_dir"]) / "test",
         n_channels=model_cfg["in_chans"],

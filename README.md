@@ -231,6 +231,49 @@ specifically rather than overall accuracy.
 confidence tracks observed accuracy closely, so the confidence value shown in the
 application is meaningful rather than decorative.
 
+### Decision offsets and what they can and cannot fix
+
+The default decision rule is argmax over the four class probabilities. That is only one
+possible operating point, and it is not obviously the right one here: glioma precision
+is 0.991 against recall 0.820, so the model is highly reluctant to predict glioma and
+almost always correct when it does. In a clinical setting a missed tumor costs more than
+a confusion between two tumor types, which argues for trading some of that precision.
+
+`scripts/tune_thresholds.py` fits one additive log-space offset per class on the
+validation split by coordinate ascent, then `scripts/evaluate.py --offsets` applies them
+once to the test split. The offsets are never fitted on test data.
+
+| Metric | argmax | tuned offsets |
+|---|---|---|
+| Macro F1 | 0.9407 [0.9286, 0.9515] | 0.9412 [0.9292, 0.9520] |
+| Balanced accuracy | 0.9419 | 0.9425 |
+| Tumor sensitivity | 0.9750 | 0.9800 |
+| Missed tumors, of 1200 | 30 | 24 |
+| Gliomas called no tumor | 25 | 21 |
+| Glioma recall | 0.820 | 0.823 |
+| Expected calibration error | 0.0098 | 0.0118 |
+
+Fitted offsets: glioma -0.12, meningioma +0.07, notumor -0.32, pituitary +0.38. The
+largest adjustment suppresses the no tumor class, which is the intended direction.
+
+**Missed tumors fell by 20 percent at no cost to macro F1, so the offsets are applied in
+the deployed model.** Calibration degraded slightly, which is expected since shifting
+the decision rule moves probabilities away from the values the network was trained to
+produce.
+
+**Glioma recall was not fixed.** It moved 0.820 to 0.823. The reason is visible in the
+confusion matrix: 42 gliomas are still classified as meningioma, and those cases are not
+near a decision boundary, so no threshold can recover them. The model represents them as
+meningioma-like. Fixing that requires changing what the model learns, not how its outputs
+are thresholded, and it is the single most valuable direction for further work.
+
+A related observation worth recording: **validation glioma recall is 0.990 while test
+glioma recall is 0.820.** The validation split is carved from the same `Training` folder
+and therefore shares its distribution, whereas the supplied `Testing` folder is
+measurably different. The glioma weakness is not visible on validation at all, which is
+why it could not be tuned away, and it is direct evidence of a distribution shift between
+the two folders rather than a simple random holdout.
+
 ### Experiment: does the asymmetry map need to preserve lesion side?
 
 The bilateral asymmetry map was originally computed as `abs(I - mirror(I))`. That
