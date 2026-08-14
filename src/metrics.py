@@ -15,6 +15,7 @@ from sklearn.metrics import (
 
 CLASS_NAMES: List[str] = ["glioma", "meningioma", "notumor", "pituitary"]
 
+
 def expected_calibration_error(
     probs: np.ndarray, labels: np.ndarray, n_bins: int = 15
 ) -> float:
@@ -36,6 +37,7 @@ def expected_calibration_error(
         ece += (count / n) * abs(bin_accuracy - bin_confidence)
 
     return float(ece)
+
 
 def compute_metrics(
     labels: np.ndarray,
@@ -91,6 +93,7 @@ def compute_metrics(
 
     return out
 
+
 def bootstrap_ci(
     labels: np.ndarray,
     probs: np.ndarray,
@@ -123,6 +126,7 @@ def bootstrap_ci(
         "hi": float(np.percentile(arr, 100 * (1 - alpha / 2))),
         "std": float(arr.std()),
     }
+
 
 def paired_bootstrap(
     labels: np.ndarray,
@@ -157,8 +161,10 @@ def paired_bootstrap(
         "prob_b_better": float((arr > 0).mean()),
     }
 
+
 def confusion(labels: np.ndarray, preds: np.ndarray, n_classes: int = 4) -> np.ndarray:
     return confusion_matrix(labels, preds, labels=list(range(n_classes)))
+
 
 def format_report(metrics: Dict[str, float],
                   class_names: Optional[Sequence[str]] = None) -> str:

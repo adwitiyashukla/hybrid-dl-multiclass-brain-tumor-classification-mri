@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class ChannelAttention(nn.Module):
 
     def __init__(self, channels: int, reduction: int = 16):
@@ -21,6 +22,7 @@ class ChannelAttention(nn.Module):
         max_pooled = F.adaptive_max_pool2d(x, 1).view(b, c)
         attention = torch.sigmoid(self.mlp(avg_pooled) + self.mlp(max_pooled))
         return x * attention.view(b, c, 1, 1)
+
 
 class SpatialAttention(nn.Module):
 
@@ -42,6 +44,7 @@ class SpatialAttention(nn.Module):
         avg_map = torch.mean(x, dim=1, keepdim=True)
         max_map, _ = torch.max(x, dim=1, keepdim=True)
         return torch.sigmoid(self.conv(torch.cat([avg_map, max_map], dim=1)))
+
 
 class CBAM(nn.Module):
 

@@ -17,6 +17,7 @@ from losses import ClassBalancedFocalLoss
 from metrics import bootstrap_ci, compute_metrics, confusion, format_report
 from models.fusion_net import build_model
 
+
 def main():
     parser = argparse.ArgumentParser(description="evaluate a checkpoint on the test set")
     parser.add_argument("--config", default="configs/base.yaml")
@@ -95,6 +96,7 @@ def main():
     out_path = Path(args.checkpoint).parent / "test_results.json"
     out_path.write_text(json.dumps(output, indent=2), encoding="utf-8")
     print(f"written {out_path}")
+
 
 if __name__ == "__main__":
     main()

@@ -18,10 +18,12 @@ from losses import ClassBalancedFocalLoss, class_balanced_weights
 from metrics import compute_metrics, format_report
 from models.fusion_net import build_model
 
+
 def set_seed(seed):
     np.random.seed(seed)
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
+
 
 def build_sampler(records, counts):
     weights_per_class = 1.0 / np.array(counts, dtype=np.float64)
@@ -29,6 +31,7 @@ def build_sampler(records, counts):
     return WeightedRandomSampler(
         weights=sample_weights, num_samples=len(records), replacement=True
     )
+
 
 def main():
     parser = argparse.ArgumentParser(description="train the Brain Tumor MRI Classifier model")
@@ -187,6 +190,7 @@ def main():
 
     print(format_report(val_metrics))
     print(f"best val macro_f1 {best_metric:.4f}")
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 
+
 def make_phantom(size=256, tumour=True, tumour_side="right", seed=0,
                  bias=True, noise=True):
     rng = np.random.default_rng(seed)

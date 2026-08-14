@@ -10,6 +10,7 @@ from skimage.feature import graycomatrix, graycoprops
 GLCM_PROPS = ("contrast", "dissimilarity", "homogeneity", "energy", "correlation", "ASM")
 GLCM_DISTANCES = (1, 3)
 
+
 def _build_feature_names() -> List[str]:
     names: List[str] = []
 
@@ -40,6 +41,7 @@ def _build_feature_names() -> List[str]:
 
 FEATURE_NAMES: List[str] = _build_feature_names()
 N_FEATURES: int = len(FEATURE_NAMES)
+
 
 def intensity_features(gray: np.ndarray, mask: np.ndarray) -> Dict[str, float]:
     brain = mask > 0
@@ -74,6 +76,7 @@ def intensity_features(gray: np.ndarray, mask: np.ndarray) -> Dict[str, float]:
     out["int_cv"] = float(values.std() / max(values.mean(), 1e-6))
 
     return out
+
 
 def geometry_features(mask: np.ndarray) -> Dict[str, float]:
     out: Dict[str, float] = {}
@@ -115,6 +118,7 @@ def geometry_features(mask: np.ndarray) -> Dict[str, float]:
     out["geom_extent"] = float(area / bbox_area) if bbox_area > 1e-6 else 0.0
 
     return out
+
 
 def asymmetry_features(asymmetry: np.ndarray, mask: np.ndarray) -> Dict[str, float]:
     out: Dict[str, float] = {}
@@ -199,6 +203,7 @@ def asymmetry_features(asymmetry: np.ndarray, mask: np.ndarray) -> Dict[str, flo
 
     return out
 
+
 def glcm_features(gray: np.ndarray, mask: np.ndarray, levels: int = 32
                   ) -> Dict[str, float]:
     out: Dict[str, float] = {}
@@ -230,6 +235,7 @@ def glcm_features(gray: np.ndarray, mask: np.ndarray, levels: int = 32
                 out[f"glcm_d{dist}_{prop}"] = 0.0
 
     return out
+
 
 def extract_features(dip_output: dict) -> Tuple[np.ndarray, Dict[str, float]]:
     gray = dip_output["gray"]

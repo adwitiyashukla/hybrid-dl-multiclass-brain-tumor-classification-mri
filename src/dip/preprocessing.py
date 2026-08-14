@@ -6,6 +6,7 @@ from typing import Tuple
 import cv2
 import numpy as np
 
+
 @dataclass
 class DIPReport:
     brain_fraction: float = 0.0
@@ -18,6 +19,7 @@ class DIPReport:
 
     def as_dict(self) -> dict:
         return asdict(self)
+
 
 def extract_brain(
     gray: np.ndarray,
@@ -61,6 +63,7 @@ def extract_brain(
 
     return mask, report
 
+
 def _largest_component(mask: np.ndarray) -> np.ndarray:
     num, labels, stats, _ = cv2.connectedComponentsWithStats(
         (mask > 0).astype(np.uint8), connectivity=8
@@ -70,6 +73,7 @@ def _largest_component(mask: np.ndarray) -> np.ndarray:
     areas = stats[1:, cv2.CC_STAT_AREA]
     largest = 1 + int(np.argmax(areas))
     return (labels == largest).astype(np.uint8) * 255
+
 
 def _fill_holes(mask: np.ndarray) -> np.ndarray:
     binary = (mask > 0).astype(np.uint8)
@@ -81,6 +85,7 @@ def _fill_holes(mask: np.ndarray) -> np.ndarray:
     holes = flooded == 0
     filled = (padded | holes).astype(np.uint8)
     return filled[1:-1, 1:-1] * 255
+
 
 def correct_bias_field(
     gray: np.ndarray,
@@ -104,9 +109,11 @@ def correct_bias_field(
 
     return np.clip(corrected, 0, 255).astype(np.uint8)
 
+
 def denoise(gray: np.ndarray, strength: float = 6.0) -> np.ndarray:
     return cv2.fastNlMeansDenoising(gray, None, h=strength,
                                     templateWindowSize=7, searchWindowSize=21)
+
 
 def normalise_intensity(
     gray: np.ndarray,
@@ -138,11 +145,13 @@ def normalise_intensity(
 
     return np.clip(scaled, 0, 255).astype(np.uint8)
 
+
 def apply_clahe(gray: np.ndarray, clip_limit: float = 2.0,
                 tile_grid: int = 8) -> np.ndarray:
     clahe = cv2.createCLAHE(clipLimit=clip_limit,
                             tileGridSize=(tile_grid, tile_grid))
     return clahe.apply(gray)
+
 
 def symmetry_analysis(
     gray: np.ndarray,
@@ -216,12 +225,14 @@ def symmetry_analysis(
 
     return np.clip(diff, 0, 255).astype(np.uint8), report
 
+
 def _warp(img: np.ndarray, angle_deg: float, shift_x: float) -> np.ndarray:
     h, w = img.shape[:2]
     matrix = cv2.getRotationMatrix2D((w / 2.0, h / 2.0), angle_deg, 1.0)
     matrix[0, 2] += shift_x
     return cv2.warpAffine(img, matrix, (w, h), flags=cv2.INTER_LINEAR,
                           borderMode=cv2.BORDER_CONSTANT, borderValue=0)
+
 
 def run_dip_pipeline(
     image: np.ndarray,
@@ -281,6 +292,7 @@ def run_dip_pipeline(
         "asymmetry": asymmetry,
         "report": report.as_dict(),
     }
+
 
 def stack_channels(dip_output: dict, n_channels: int = 3) -> np.ndarray:
     gray = dip_output["gray"]

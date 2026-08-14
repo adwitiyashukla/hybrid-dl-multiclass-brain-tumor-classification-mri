@@ -3,11 +3,13 @@ from pathlib import Path
 
 import numpy as np
 
+
 def apply_offsets(probs, offsets):
     logp = np.log(np.clip(probs, 1e-12, 1.0)) + np.asarray(offsets)[None, :]
     logp = logp - logp.max(axis=1, keepdims=True)
     adjusted = np.exp(logp)
     return adjusted / adjusted.sum(axis=1, keepdims=True)
+
 
 def objective_value(labels, probs, offsets, objective, notumor_index):
     from metrics import compute_metrics
@@ -20,6 +22,7 @@ def objective_value(labels, probs, offsets, objective, notumor_index):
     pred_tumor = preds != notumor_index
     sensitivity = (pred_tumor & true_tumor).sum() / max(true_tumor.sum(), 1)
     return metrics["macro_f1"] + 0.5 * sensitivity
+
 
 def coordinate_search(labels, probs, objective, notumor_index,
                       span=2.0, step=0.1, passes=3):
@@ -45,6 +48,7 @@ def coordinate_search(labels, probs, objective, notumor_index,
             break
 
     return offsets - offsets.mean(), best
+
 
 def load_offsets(path):
     path = Path(path)

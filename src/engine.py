@@ -6,12 +6,14 @@ from pathlib import Path
 import numpy as np
 import torch
 
+
 def make_autocast(device, enabled):
     device_type = "cuda" if device.type == "cuda" else "cpu"
     try:
         return torch.amp.autocast(device_type=device_type, enabled=enabled)
     except (AttributeError, TypeError):
         return torch.cuda.amp.autocast(enabled=enabled)
+
 
 def make_scaler(device, enabled):
     try:
@@ -20,6 +22,7 @@ def make_scaler(device, enabled):
         )
     except (AttributeError, TypeError):
         return torch.cuda.amp.GradScaler(enabled=enabled)
+
 
 class ModelEma:
     def __init__(self, model, decay=0.999, warmup=True):
@@ -52,6 +55,7 @@ class ModelEma:
     def load_state_dict(self, state):
         self.module.load_state_dict(state)
 
+
 def cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps, min_scale=0.01):
     def lr_lambda(step):
         if step < warmup_steps:
@@ -61,6 +65,7 @@ def cosine_schedule_with_warmup(optimizer, warmup_steps, total_steps, min_scale=
         return min_scale + (1.0 - min_scale) * 0.5 * (1.0 + np.cos(np.pi * progress))
 
     return torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+
 
 def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler,
                     device, use_handcrafted, grad_accum_steps=1,
@@ -114,6 +119,7 @@ def train_one_epoch(model, loader, criterion, optimizer, scheduler, scaler,
         "seconds": time.time() - start,
     }
 
+
 @torch.no_grad()
 def evaluate(model, loader, criterion, device, use_handcrafted):
     model.eval()
@@ -147,6 +153,7 @@ def evaluate(model, loader, criterion, device, use_handcrafted):
         "gates": np.concatenate(all_gates) if all_gates else None,
     }
 
+
 def save_checkpoint(path, model, optimizer, scheduler, scaler, ema, epoch,
                     best_metric, config, history):
     path = Path(path)
@@ -167,6 +174,7 @@ def save_checkpoint(path, model, optimizer, scheduler, scaler, ema, epoch,
     torch.save(payload, tmp)
     tmp.replace(path)
 
+
 def load_checkpoint(path, model, optimizer=None, scheduler=None, scaler=None,
                     ema=None, device="cpu"):
     payload = torch.load(path, map_location=device, weights_only=False)
@@ -181,6 +189,7 @@ def load_checkpoint(path, model, optimizer=None, scheduler=None, scaler=None,
         ema.load_state_dict(payload["ema"])
         ema.updates = payload.get("ema_updates", 0)
     return payload
+
 
 def write_history(path, history):
     Path(path).write_text(json.dumps(history, indent=2), encoding="utf-8")

@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 def class_balanced_weights(
     samples_per_class: Sequence[int], beta: float = 0.9999
 ) -> torch.Tensor:
@@ -19,6 +20,7 @@ def class_balanced_weights(
     weights = weights / weights.sum() * len(counts)
 
     return torch.tensor(weights, dtype=torch.float32)
+
 
 class ClassBalancedFocalLoss(nn.Module):
 

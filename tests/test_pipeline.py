@@ -30,15 +30,18 @@ requires_torch = pytest.mark.skipif(
     not TORCH_AVAILABLE, reason="torch and timm are required for model tests"
 )
 
+
 @pytest.fixture(scope="module")
 def tumour_case():
     image, centre = make_phantom(tumour=True, tumour_side="right", seed=1)
     return image, centre
 
+
 @pytest.fixture(scope="module")
 def healthy_case():
     image, _ = make_phantom(tumour=False, seed=2)
     return image
+
 
 def test_apply_offsets_returns_valid_distribution():
     rng = np.random.default_rng(0)
@@ -50,6 +53,7 @@ def test_apply_offsets_returns_valid_distribution():
     assert np.allclose(adjusted.sum(axis=1), 1.0)
     assert (adjusted >= 0).all()
 
+
 def test_zero_offsets_leave_predictions_unchanged():
     rng = np.random.default_rng(1)
     logits = rng.normal(0, 1, (50, 4))
@@ -57,6 +61,7 @@ def test_zero_offsets_leave_predictions_unchanged():
     adjusted = apply_offsets(probs, [0.0, 0.0, 0.0, 0.0])
 
     assert np.allclose(adjusted, probs, atol=1e-9)
+
 
 def test_offset_search_recovers_a_suppressed_class():
     rng = np.random.default_rng(2)
@@ -77,12 +82,14 @@ def test_offset_search_recovers_a_suppressed_class():
     assert after["recall_glioma"] > before["recall_glioma"]
     assert abs(float(np.mean(offsets))) < 1e-9
 
+
 def test_brain_extraction_plausible(tumour_case):
     image, _ = tumour_case
     mask, report = extract_brain(image)
     fraction = (mask > 0).mean()
     assert 0.25 < fraction < 0.75
     assert not report.brain_extraction_failed
+
 
 def test_bias_correction_reduces_left_right_ramp(tumour_case):
     image, _ = tumour_case
@@ -102,6 +109,7 @@ def test_bias_correction_reduces_left_right_ramp(tumour_case):
 
     assert after < before
 
+
 def test_symmetry_localises_tumour(tumour_case):
     image, centre = tumour_case
     output = run_dip_pipeline(image, output_size=256)
@@ -113,6 +121,7 @@ def test_symmetry_localises_tumour(tumour_case):
     distance = np.hypot(cols.mean() - centre[0], rows.mean() - centre[1])
     assert distance < 45
 
+
 def peak_region_centroid(asymmetry, percentile=97):
     positive = asymmetry[asymmetry > 0]
     if positive.size < 10:
@@ -120,6 +129,7 @@ def peak_region_centroid(asymmetry, percentile=97):
     threshold = np.percentile(positive, percentile)
     rows, cols = np.where(asymmetry >= threshold)
     return float(cols.mean())
+
 
 def test_asymmetry_map_tracks_lesion_side():
     centroids = {}
@@ -136,11 +146,13 @@ def test_asymmetry_map_tracks_lesion_side():
     assert observed > 0
     assert observed > 0.25 * expected
 
+
 def test_tumour_more_asymmetric_than_healthy(tumour_case, healthy_case):
     image, _ = tumour_case
     tumour_output = run_dip_pipeline(image, output_size=256)
     healthy_output = run_dip_pipeline(healthy_case, output_size=256)
     assert tumour_output["asymmetry"].mean() > healthy_output["asymmetry"].mean()
+
 
 def test_feature_vector_shape_and_validity(tumour_case):
     image, _ = tumour_case
@@ -153,8 +165,10 @@ def test_feature_vector_shape_and_validity(tumour_case):
     assert not np.isinf(vector).any()
     assert len(named) == len(FEATURE_NAMES)
 
+
 def test_feature_names_unique():
     assert len(set(FEATURE_NAMES)) == len(FEATURE_NAMES)
+
 
 @pytest.mark.parametrize("n_channels", [1, 2, 3])
 def test_channel_stacking(tumour_case, n_channels):
@@ -162,6 +176,7 @@ def test_channel_stacking(tumour_case, n_channels):
     output = run_dip_pipeline(image, output_size=256)
     stacked = stack_channels(output, n_channels)
     assert stacked.shape == (256, 256, n_channels)
+
 
 @pytest.mark.parametrize(
     "image",
@@ -171,10 +186,13 @@ def test_channel_stacking(tumour_case, n_channels):
         np.zeros((16, 16), np.uint8),
     ],
 )
+
+
 def test_degenerate_inputs_do_not_crash(image):
     output = run_dip_pipeline(image, output_size=128)
     vector, _ = extract_features(output)
     assert not np.isnan(vector).any()
+
 
 def test_symmetry_analysis_returns_report(tumour_case):
     image, _ = tumour_case
@@ -183,6 +201,7 @@ def test_symmetry_analysis_returns_report(tumour_case):
     assert asymmetry.shape == image.shape
     assert -15.0 <= report.symmetry_angle <= 15.0
 
+
 def test_pipeline_switches_disable_stages(tumour_case):
     image, _ = tumour_case
     output = run_dip_pipeline(
@@ -190,11 +209,13 @@ def test_pipeline_switches_disable_stages(tumour_case):
     )
     assert output["asymmetry"].max() == 0
 
+
 @requires_torch
 def test_cbam_preserves_shape():
     block = CBAM(32)
     x = torch.randn(2, 32, 16, 16)
     assert block(x).shape == x.shape
+
 
 @requires_torch
 def test_model_forward_and_backward():
@@ -214,6 +235,7 @@ def test_model_forward_and_backward():
     grads = [p.grad for p in model.parameters() if p.grad is not None]
     assert len(grads) > 0
 
+
 @requires_torch
 def test_model_without_handcrafted_branch():
     model = HybridTumorNet(
@@ -223,6 +245,7 @@ def test_model_without_handcrafted_branch():
     output = model(torch.randn(2, 1, 128, 128))
     assert output["logits"].shape == (2, 4)
     assert output["gate"] is None
+
 
 @requires_torch
 def test_class_balanced_weights_favour_rare_classes():
@@ -235,6 +258,7 @@ def test_class_balanced_weights_favour_rare_classes():
     criterion = ClassBalancedFocalLoss(weights=weights, gamma=2.0)
     loss = criterion(torch.randn(8, 4), torch.randint(0, 4, (8,)))
     assert torch.isfinite(loss)
+
 
 @requires_torch
 def test_gradcam_matches_image_size():

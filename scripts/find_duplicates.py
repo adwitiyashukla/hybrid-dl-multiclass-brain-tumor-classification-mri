@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from data.dataset import CLASS_NAMES
 
+
 def embed_split(root, size=32):
     root = Path(root)
     vectors = []
@@ -33,6 +34,7 @@ def embed_split(root, size=32):
             meta.append({"class_name": class_name, "filename": path.name,
                          "path": str(path)})
     return np.stack(vectors), meta
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -93,6 +95,7 @@ def main():
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     print(f"written {output}")
+
 
 if __name__ == "__main__":
     main()

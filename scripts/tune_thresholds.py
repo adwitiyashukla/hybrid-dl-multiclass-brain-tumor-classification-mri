@@ -18,6 +18,7 @@ from losses import ClassBalancedFocalLoss
 from metrics import compute_metrics, format_report
 from models.fusion_net import build_model
 
+
 def main():
     parser = argparse.ArgumentParser(
         description="tune per class decision offsets on the validation split"
@@ -85,6 +86,7 @@ def main():
         "validation_macro_f1_tuned": tuned_metrics["macro_f1"],
     }, indent=2), encoding="utf-8")
     print(f"\nwritten {output}")
+
 
 if __name__ == "__main__":
     main()

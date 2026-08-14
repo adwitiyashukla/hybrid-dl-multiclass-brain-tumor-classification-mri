@@ -7,6 +7,7 @@ import torch.nn as nn
 
 from .cbam import CBAM
 
+
 class HandcraftedEncoder(nn.Module):
 
     def __init__(self, n_features: int, hidden: int = 256, out_dim: int = 128,
@@ -24,6 +25,7 @@ class HandcraftedEncoder(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
 
+
 class GatedFusion(nn.Module):
 
     def __init__(self, cnn_dim: int, hand_dim: int, out_dim: int = 256):
@@ -39,6 +41,7 @@ class GatedFusion(nn.Module):
         gate = self.gate(torch.cat([f_cnn, f_hand], dim=1))
         fused = gate * self.cnn_proj(f_cnn) + (1.0 - gate) * self.hand_proj(f_hand)
         return fused, gate
+
 
 class HybridTumorNet(nn.Module):
 
@@ -128,6 +131,7 @@ class HybridTumorNet(nn.Module):
             "gate": gate_summary,
             "fmap": fmap,
         }
+
 
 def build_model(config: dict) -> HybridTumorNet:
     model_cfg = config.get("model", {})

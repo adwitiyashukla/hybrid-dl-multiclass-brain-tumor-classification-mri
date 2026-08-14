@@ -177,59 +177,96 @@ report mean and standard deviation.
 
 ## Results
 
-Measured on the 1600 image held out test split, using the checkpoint selected by
-validation macro F1. Confidence intervals are bootstrap percentile intervals over 2000
-resamples of the test set. This is the configuration deployed in the live demo.
+### Train and test overlap in this dataset
+
+Before any metric below is read, this has to be stated. **About 26 percent of the
+supplied test split consists of duplicates of training images.**
+
+`scripts/find_duplicates.py` embeds every image as a 32x32 mean centred vector and
+computes cosine similarity between the two splits. At a threshold of 0.999, 420 of 1600
+test images match a training image, and the closest pairs sit at similarity 1.000000,
+meaning pixel identical. 418 of those 420 pairs carry the same class label, which rules
+out coincidental anatomical similarity: were these chance matches between different
+scans, class agreement would be near 25 percent, not 99.5 percent. The duplicates carry
+different filenames in each split, which is why a filename comparison finds nothing.
+
+The overlap is very unevenly distributed:
+
+| Class | Duplicated from training | Clean test images remaining |
+|---|---|---|
+| notumor | 310 of 400, 77.5 percent | 90 |
+| meningioma | 103 of 400, 25.8 percent | 297 |
+| glioma | 7 of 400, 1.8 percent | 393 |
+| pituitary | 0 of 400, 0.0 percent | 400 |
+
+Reproduce with:
+
+```
+python scripts/find_duplicates.py --config configs/base.yaml
+```
+
+### Primary result, leak free test split
+
+Computed on the 1180 test images with no near duplicate in the training split, using
+tuned decision offsets fitted on validation. This is the honest number for this model.
 
 | Metric | Value |
 |---|---|
-| Macro F1 | 0.9407, 95 percent CI [0.9286, 0.9515] |
-| Balanced accuracy | 0.9419, 95 percent CI [0.9309, 0.9519] |
-| Macro AUC | 0.9878 |
-| Cohen kappa | 0.9225 |
-| Expected calibration error | 0.0098 |
-| Tumor sensitivity | 0.9750 |
-| Tumor specificity | 0.9950 |
-| Mean fusion gate | 0.476 |
-
-Per class:
+| Macro F1 | 0.9190, 95 percent CI [0.9011, 0.9365] |
+| Balanced accuracy | 0.9428, 95 percent CI [0.9312, 0.9540] |
+| Macro AUC | 0.9867 |
+| Cohen kappa | 0.8987 |
+| Expected calibration error | 0.0186 |
+| Tumor sensitivity | 0.9798 |
+| Tumor specificity | 1.0000 |
+| Mean fusion gate | 0.452 |
 
 | Class | Precision | Recall | F1 | n |
 |---|---|---|---|---|
-| glioma | 0.991 | 0.820 | 0.897 | 400 |
-| meningioma | 0.899 | 0.958 | 0.927 | 400 |
-| notumor | 0.930 | 0.995 | 0.961 | 400 |
-| pituitary | 0.959 | 0.995 | 0.977 | 400 |
-
-Confusion matrix, rows are true class, columns are predicted:
+| glioma | 0.994 | 0.824 | 0.901 | 393 |
+| meningioma | 0.875 | 0.946 | 0.909 | 297 |
+| notumor | 0.804 | 1.000 | 0.891 | 90 |
+| pituitary | 0.950 | 1.000 | 0.974 | 400 |
 
 ```
               glioma  mening  notumor  pituit
-glioma           328      40       25       7
-meningioma         2     383        5      10
-notumor            0       2      398       0
-pituitary          1       1        0     398
+glioma           324      40       21       8
+meningioma         2     281        1      13
+notumor            0       0       90       0
+pituitary          0       0        0     400
 ```
 
-### Reading these results honestly
+### What deduplication changed, and what it did not
 
-**Validation reported 0.9798 balanced accuracy and the test set gives 0.9419.** The gap
-is expected, since the checkpoint was chosen by validation score. The test number is
-the one quoted here and the validation number is not.
+| Metric | Full test split, 1600 | Leak free split, 1180 |
+|---|---|---|
+| Macro F1 | 0.9412 | 0.9190 |
+| Balanced accuracy | 0.9425 | 0.9428 |
+| Macro AUC | 0.9881 | 0.9867 |
+| Tumor sensitivity | 0.9800 | 0.9798 |
+| notumor precision | 0.943 | 0.804 |
+| notumor support | 400 | 90 |
 
-**Glioma is the weakest class at 0.820 recall.** 72 of 400 gliomas were misclassified,
-40 of them as meningioma. Gliomas are infiltrative and heterogeneous in appearance, so
-this is the expected direction of failure.
+**Balanced accuracy barely moved, from 0.9425 to 0.9428.** That is not a contradiction.
+Balanced accuracy is mean per class recall, and recall measures performance on each
+class in isolation, so removing duplicated examples of a class the model already handles
+well leaves it essentially unchanged.
 
-**25 gliomas were classified as no tumor.** These are the clinically consequential
-errors, since a missed tumor carries far more cost than a confusion between two tumor
-types. Overall tumor sensitivity is 0.9750, meaning 30 of 1200 tumor cases were called
-healthy, and 25 of those 30 were gliomas. Any future work should target glioma recall
-specifically rather than overall accuracy.
+**Macro F1 fell by 0.022** because it incorporates precision. Removing 310 of 400
+notumor images left only 90 true negatives to absorb the false positives arriving from
+other classes, so notumor precision dropped from 0.943 to 0.804 and dragged the macro
+average down.
 
-**Calibration is good.** An expected calibration error of 0.0098 means predicted
-confidence tracks observed accuracy closely, so the confidence value shown in the
-application is meaningful rather than decorative.
+An honest caveat on the leak free subset: because the duplication was concentrated in
+one class, the remaining subset is itself imbalanced at 393, 297, 90 and 400. Part of
+the shift in precision based metrics is attributable to that changed class balance
+rather than to leakage alone. Separating those two effects cleanly would require a
+dataset where the overlap is uniform across classes, which this one is not.
+
+The reported drop is therefore best read as a lower bound on the optimism in the naive
+protocol. The perceptual hash used is also a lower bound in a second sense: it detects
+duplicates and near duplicates, but a rotated or reflected copy of a training image
+would not be matched by it and would remain undetected in the test split.
 
 ### Decision offsets and what they can and cannot fix
 

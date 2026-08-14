@@ -9,6 +9,7 @@ CLASS_NAMES = ["glioma", "meningioma", "notumor", "pituitary"]
 CLASS_TO_INDEX = {name: i for i, name in enumerate(CLASS_NAMES)}
 IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff"}
 
+
 def scan_directory(root):
     root = Path(root)
     records = []
@@ -30,11 +31,13 @@ def scan_directory(root):
         )
     return records
 
+
 def class_counts(records, n_classes=4):
     counts = [0] * n_classes
     for record in records:
         counts[record["label"]] += 1
     return counts
+
 
 def split_train_val(records, val_fraction=0.15, seed=42):
     rng = np.random.default_rng(seed)
@@ -54,12 +57,14 @@ def split_train_val(records, val_fraction=0.15, seed=42):
     rng.shuffle(val)
     return train, val
 
+
 def save_split(train, val, path):
     payload = {
         "train": [r["path"] for r in train],
         "val": [r["path"] for r in val],
     }
     Path(path).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
 
 class BrainMRIDataset(Dataset):
     def __init__(self, records, cache_dir=None, n_channels=3,

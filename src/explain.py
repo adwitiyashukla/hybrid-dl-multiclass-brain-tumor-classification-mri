@@ -3,6 +3,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 
+
 class GradCAMPlusPlus:
     def __init__(self, model, target_layer=None):
         self.model = model
@@ -83,6 +84,7 @@ class GradCAMPlusPlus:
             normalised.append(single / peak if peak > 1e-8 else single)
         return np.stack(normalised), class_index.detach().cpu().numpy()
 
+
 def overlay_heatmap(gray_image, cam, alpha=0.45, colormap=cv2.COLORMAP_JET):
     if gray_image.ndim == 2:
         base = cv2.cvtColor(gray_image, cv2.COLOR_GRAY2BGR)
@@ -95,6 +97,7 @@ def overlay_heatmap(gray_image, cam, alpha=0.45, colormap=cv2.COLORMAP_JET):
     heat = cv2.applyColorMap((cam * 255).astype(np.uint8), colormap)
     blended = cv2.addWeighted(base, 1.0 - alpha, heat, alpha, 0.0)
     return cv2.cvtColor(blended, cv2.COLOR_BGR2RGB)
+
 
 def cam_mask_iou(cam, mask, threshold=0.5):
     if cam.shape != mask.shape:

@@ -13,6 +13,7 @@ from data.dataset import scan_directory
 from dip.handcrafted import extract_features, FEATURE_NAMES
 from dip.preprocessing import run_dip_pipeline
 
+
 def process_split(records, cache_dir, image_size, dip_options, report_path):
     cache_dir = Path(cache_dir)
     rows = []
@@ -61,6 +62,7 @@ def process_split(records, cache_dir, image_size, dip_options, report_path):
 
     return rows, failures
 
+
 def summarise(rows):
     if not rows:
         return
@@ -74,6 +76,7 @@ def summarise(rows):
     print(f"  low contrast flagged      {low_contrast} ({100.0 * low_contrast / len(rows):.2f} percent)")
     print(f"  brain fraction mean       {brain_fraction.mean():.4f}")
     print(f"  symmetry score mean       {symmetry.mean():.4f}")
+
 
 def main():
     parser = argparse.ArgumentParser(
@@ -106,6 +109,7 @@ def main():
             print(f"  unreadable files          {failures}")
 
     print(f"feature vector length {len(FEATURE_NAMES)}")
+
 
 if __name__ == "__main__":
     main()
